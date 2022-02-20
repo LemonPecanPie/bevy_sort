@@ -9,6 +9,7 @@ edition = "2021"
 bevy_flycam = "*"
 rand = "0.8"
 wasm-bindgen = "0.2"
+bevy_atmosphere = "0.2"
 
 [dependencies.bevy]
 version = "0.6"

@@ -1,7 +1,8 @@
 use bevy::prelude::*;
+use bevy_atmosphere::*;
 use bevy_flycam::{MovementSettings, PlayerPlugin};
-use rand::Rng;
 use bevy_kira_audio::{Audio, AudioPlugin};
+use rand::Rng;
 
 fn main() {
     App::new()
@@ -9,22 +10,25 @@ fn main() {
         .insert_resource(Colors {
             ..Default::default()
         })
-        /*.insert_resource(AmbientLight {
-            //brightness: 0.5,
+        .insert_resource(AmbientLight {
+            brightness: 0.7,
             ..Default::default()
-        })*/
+        })
         .insert_resource(Sort {
             ..Default::default()
         })
+        .insert_resource(bevy_atmosphere::AtmosphereMat::default()) // Default Earth sky
         .add_plugins(DefaultPlugins)
         .add_plugin(PlayerPlugin)
         .add_plugin(AudioPlugin)
+        .add_plugin(bevy_atmosphere::AtmospherePlugin { dynamic: true }) // Set to false since we aren't changing the sky's appearance
         .insert_resource(MovementSettings {
-            sensitivity: 0.00015, // default: 0.00012
+            sensitivity: 0.00024, // default: 0.00012
             speed: 16.0,          // default: 12.0
         })
         .add_startup_system(setup)
         .add_system(change_color)
+        .add_system(daylight_cycle)
         .run();
 }
 
@@ -33,6 +37,24 @@ const NUMBER_OF_BOXES: u32 = 1000;
 const DISTANCE_BETWEEN_BOXES: f32 = 2.;
 const MINIMUM_BOX_HEIGHT: f32 = 1.;
 const MAXIMUM_BOX_HEIGHT: f32 = 1000.;
+
+// Marker for updating the position of the light, not needed unless we have multiple lights
+#[derive(Component)]
+struct Sun;
+
+// We can edit the SkyMaterial resource and it will be updated automatically, as long as ZephyrPlugin.dynamic is true
+fn daylight_cycle(mut sky_mat: ResMut<AtmosphereMat>, mut query: Query<(&mut Transform, &mut DirectionalLight), With<Sun>>, time: Res<Time>) {
+    let mut pos = sky_mat.sun_position;
+    let t = time.time_since_startup().as_millis() as f32 / 64000.0;
+    pos.y = t.sin();
+    pos.z = t.cos();
+    sky_mat.sun_position = pos;
+
+    if let Some((mut light_trans, mut directional)) = query.single_mut().into() {
+        light_trans.rotation = Quat::from_rotation_x(-pos.y.atan2(pos.z));
+        directional.illuminance = t.sin().max(0.0).powf(2.0) * 100000.0;
+    }
+}
 
 /// set up a simple 3D scene
 fn setup(
@@ -92,7 +114,7 @@ fn setup(
         transform: Transform::from_xyz(4.0, 8.0, 4.0),
         ..Default::default()
     });
-    commands.spawn_bundle(DirectionalLightBundle {
+    /*commands.spawn_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: 3000.,
             shadows_enabled: true,
@@ -101,7 +123,12 @@ fn setup(
         transform: Transform::from_xyz(1000., 1000., 1000.),
 
         ..Default::default()
-    });
+    });*/
+    // Our Sun
+    commands.spawn_bundle(DirectionalLightBundle {
+        ..Default::default()
+    })
+        .insert(Sun); // Marks the light as Sun
 }
 
 #[derive(Component)]
